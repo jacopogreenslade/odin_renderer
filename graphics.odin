@@ -15,6 +15,7 @@ GraphicsApp :: struct {
 	mat_projection:    glm.mat4,
 	mat_model:         glm.mat4,
 	mesh_list:         [dynamic]Mesh,
+	sel_entity_idx:    int,
 }
 
 BufPtrs :: struct {
@@ -35,6 +36,8 @@ graphics_app_setup :: proc() -> (GraphicsApp, bool) {
 	// load the OpenGL procedures once an OpenGL context has been established
 	gl.load_up_to(GL_VERSION_MAJOR, GL_VERSION_MINOR, SDL.gl_set_proc_address)
 	// useful utility procedures that are part of vendor:OpenGl
+
+	// Load the default gl shaders at startup
 	program, program_ok := gl.load_shaders_file("./shaders/default.vert", "./shaders/default.frag")
 	if !program_ok {
 		fmt.eprintln("Failed to create GLSL program")
@@ -44,9 +47,9 @@ graphics_app_setup :: proc() -> (GraphicsApp, bool) {
 	info.shader_program_id = program
 	gl.UseProgram(info.shader_program_id)
 
+	// Store the uniforms info for the default shaders
 	uniforms := gl.get_uniforms_from_program(program)
 	info.uniforms = uniforms
-	fmt.println("uniforms:", uniforms, program, vertex_source)
 
 	// defer delete(uniforms)
 	info.mat_view = glm.mat4LookAt({0, -2, +1}, {0, 0, 0}, {0, 0, 1})
@@ -55,6 +58,9 @@ graphics_app_setup :: proc() -> (GraphicsApp, bool) {
 
 	// Needed for avoiding mesh overlap issues
 	gl.Enable(gl.DEPTH_TEST)
+
+	// Default selected entity
+	info.sel_entity_idx = 1
 
 	return info, true
 }
@@ -133,8 +139,13 @@ graphics_entity_lst_render :: proc(app_info: ^GraphicsApp, e_list: ^EntityList, 
 	// matrix types in Odin are stored in column-major format but written as you'd normal write them
 	gl.UniformMatrix4fv(app_info.uniforms["u_transform"].location, 1, false, &u_transform[0, 0])
 
-	grot := glm.identity(glm.mat4)
-	gl.UniformMatrix4fv(app_info.uniforms["u_rotation"].location, 1, false, &grot[0, 0])
+	u_rotation, ok := app_info.uniforms["u_rotation"]
+	if ok {
+		grot := glm.identity(glm.mat4)
+		gl.UniformMatrix4fv(app_info.uniforms["u_rotation"].location, 1, false, &grot[0, 0])
+	} else {
+		fmt.println("No such uniform", "u_rotation", u_rotation)
+	}
 
 	gl.Viewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
 	BACKGROUND_COLOR := glm.vec4{0.5, 0.7, 1.0, 1.0}
@@ -152,7 +163,7 @@ graphics_entity_lst_render :: proc(app_info: ^GraphicsApp, e_list: ^EntityList, 
 		mesh, found := mesh_get_by_id(app_info, entity.mesh_id) // currently need it only for the indices
 		// fmt.println("Mesh found: ", mesh.id, mesh.name, found)
 		if !found {
-			// fmt.eprintln("ERROR: Mesh not found: ", entity.mesh_id)
+			fmt.eprintln("ERROR: Mesh not found: ", entity.mesh_id)
 			continue
 		}
 		// Update the uniforms for this particular enitity in the shader
@@ -165,11 +176,16 @@ graphics_entity_lst_render :: proc(app_info: ^GraphicsApp, e_list: ^EntityList, 
 			glm.quatAxisAngle(glm.vec3{0, 1, 0}, glm.radians_f32(entity.rotation[1])) *
 			glm.quatAxisAngle(glm.vec3{0, 0, 1}, glm.radians_f32(entity.rotation[2]))
 		ent_rot := glm.mat4FromQuat(q)
-		gl.UniformMatrix4fv(app_info.uniforms["u_ent_rot"].location, 1, false, &ent_rot[0, 0])
+		// if entity.name == "Cube" {
+		// 	v := glm.vec4 { 2.0 , 4.0 , 6.0 , 1.0 }
+		// 	fmt.println("vector - rot", ent_rot, "identity", grot, "multiply", grot*ent_rot)
+		// 	fmt.println("mat - rot", ent_rot*v, "identity", grot*v, "multiply", grot*ent_rot*v)
+		// }
+		gl.UniformMatrix4fv(app_info.uniforms["u_ent_rot"].location, 1, true, &ent_rot[0, 0])
 
 		scl := glm.mat4Scale(entity.scale)
 		gl.UniformMatrix4fv(app_info.uniforms["u_ent_scl"].location, 1, false, &scl[0, 0])
-
+		
 		// Bind vao and draw
 		gl.BindVertexArray(entity.vao)
 		gl.DrawElements(gl.TRIANGLES, i32(len(mesh.indices)), gl.UNSIGNED_SHORT, nil)
@@ -212,6 +228,31 @@ graphics_load_new_assets :: proc(app_info: ^GraphicsApp, e_list: ^EntityList, fn
 	}
 
 	fmt.println("Running setup again to update buffers and load new assets")
+	// Create vaos etc for new entities
+	graphics_entity_lst_setup(app_info, &el)
+	// Finally add new entities to entity_list
+	append(&e_list.entities, ..el.entities[:])
+}
+
+graphics_copy_entity :: proc(app_info: ^GraphicsApp, e_list: ^EntityList, e: ^Entity) {
+	el := EntityList{}
+	defer delete(el.entities)
+
+	// For now we add a new entity for every new imported
+	// mesh. Leter we might want to decouple these
+	fmt.println("Copyting", e.name, "...")
+	mesh, ok := mesh_get_by_id(app_info, e.mesh_id)
+	append(&el.entities, Entity{
+		mesh_name = e.mesh_name,
+		name=strings.concatenate({e.mesh_name, "(1)"}),
+		mesh_id = mesh.id,
+		position = e.position,
+		rotation = e.rotation,
+		scale = e.scale,
+	})
+	append(&app_info.mesh_list, mesh)
+
+	fmt.println("Run setup to create vaos etc...")
 	// Create vaos etc for new entities
 	graphics_entity_lst_setup(app_info, &el)
 	// Finally add new entities to entity_list

@@ -70,20 +70,6 @@ main :: proc() {
 	defer delete(entity_list.entities)
 	defer graphics_del_entity_ptr_groups(&entity_list)
 
-	{
-
-		// mesh, ok := mesh_deserialize_json("cube")
-		// mesh, err := mesh_from_obj_file("cube.obj")
-		// defer obj_delete(&mesh)
-		
-		// entity_list.name = "Demo EL"
-		// entity_list.entities = make([]Entity, 1); 
-		
-		// Manually assign the mesh to the list
-		// entity_list.entities[0].mesh_name = mesh.name
-		// entity_list.entities[0].mesh = &mesh
-	}
-
 	// fmt.println("Entity list", entity_list)
 	success := entity_list_serialize_json(&entity_list)
 	if !success {
@@ -99,7 +85,8 @@ main :: proc() {
 	last_check := start_tick
 
 	// Allows me to move stuff around
-	selected := &entity_list.entities[2]
+	selected := &entity_list.entities[app_info.sel_entity_idx]
+	fmt.println("Selected:", selected.name)
 
 	loop: for {
 		duration := time.tick_since(start_tick)
@@ -148,11 +135,21 @@ main :: proc() {
 					selected.position[1] -= 0.1;
 				case .E:
 					selected.position[1] += 0.1;
+				case .TAB:
+					app_info.sel_entity_idx = (app_info.sel_entity_idx + 1) % len(entity_list.entities)
+					selected = &entity_list.entities[app_info.sel_entity_idx]
+					fmt.println("Selected entity", selected.name)
+				case .RETURN:
+					// Save current setup
+					success := entity_list_serialize_json(&entity_list)
+				case .C:
+					// copy entity
+					graphics_copy_entity(&app_info, &entity_list, selected)
 				}
-			case .QUIT:
-				// labelled control flow
-				break loop
-			}
+				case .QUIT:
+					// labelled control flow
+					break loop
+				}
 		}
 
 		// graphics_mesh_list_render(&app_info, mesh_list, t)
