@@ -5,6 +5,7 @@ import glm "core:math/linalg/glsl"
 import "core:strings"
 import gl "vendor:OpenGL"
 import SDL "vendor:sdl2"
+import stb "src"
 
 GraphicsApp :: struct {
 	shader_program_id: u32,
@@ -16,6 +17,8 @@ GraphicsApp :: struct {
 	mat_model:         glm.mat4,
 	mesh_list:         [dynamic]Mesh,
 	sel_entity_idx:    int,
+
+	tex_test:						u32,
 }
 
 BufPtrs :: struct {
@@ -91,7 +94,30 @@ graphics_entity_lst_setup :: proc(app_info: ^GraphicsApp, e_list: ^EntityList) {
 		gl.BindVertexArray(entities[i].vao)
 		gl.BindBuffer(gl.ARRAY_BUFFER, entities[i].vbo)
 		gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, entities[i].ebo)
-		fmt.println("Entity: ", entity.name, entities[i].vao, entities[i].vbo, entities[i].ebo)
+		// fmt.println("Entity: ", entity.name, entities[i].vao, entities[i].vbo, entities[i].ebo)
+
+		// Load a single texture
+		if true {
+			// Pixels as a byte array
+			textId: u32
+			w, h, channels: i32
+			stb.set_flip_vertically_on_load(1);
+			pixels : ^u8 = stb.load("assets/wood.jpg", &w, &h, &channels, 4 );
+			if pixels == nil {
+				fmt.println("ERROR: Failed to load texture!")
+			} else {
+				gl.GenTextures(1, &textId)
+				gl.BindTexture(gl.TEXTURE_2D, textId)
+				gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+				gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+				gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+				gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+				gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+				gl.GenerateMipmap(gl.TEXTURE_2D)
+				app_info.tex_test = textId
+			}
+			defer stb.image_free(pixels)
+		}
 
 		for item in attributes {
 			gl.EnableVertexAttribArray(item.idx)
@@ -144,7 +170,7 @@ graphics_entity_lst_render :: proc(app_info: ^GraphicsApp, e_list: ^EntityList, 
 		grot := glm.identity(glm.mat4)
 		gl.UniformMatrix4fv(app_info.uniforms["u_rotation"].location, 1, false, &grot[0, 0])
 	} else {
-		fmt.println("No such uniform", "u_rotation", u_rotation)
+		// fmt.println("No such uniform", "u_rotation", u_rotation)
 	}
 
 	gl.Viewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -187,6 +213,7 @@ graphics_entity_lst_render :: proc(app_info: ^GraphicsApp, e_list: ^EntityList, 
 		gl.UniformMatrix4fv(app_info.uniforms["u_ent_scl"].location, 1, false, &scl[0, 0])
 		
 		// Bind vao and draw
+		gl.BindTexture(gl.TEXTURE, app_info.tex_test)
 		gl.BindVertexArray(entity.vao)
 		gl.DrawElements(gl.TRIANGLES, i32(len(mesh.indices)), gl.UNSIGNED_SHORT, nil)
 	}
@@ -267,3 +294,4 @@ mesh_get_by_id :: proc(app_info: ^GraphicsApp, mesh_id: u32) -> (Mesh, bool) {
 	}
 	return Mesh{}, false
 }
+

@@ -17,6 +17,40 @@ Assuming there's only 1 scene, we should add serialization for Objects and handl
   - Check for serialized objects
   - If there are any, load them
 
+### Compiling a static lib in c to be linked in Odin
+In this case the lib was `stb_image` and I wanted to use the bindings from `odin_stb` repo to import images. The scenario is that we have a `.h` singe header file but we WANT a `.lib` static library. 
+
+The compilation step was written by the author, but didn't seem to work in any cmd line on windows. Turns out you need to use the `vs developer cmd prompt`:
+```
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.9.5
+** Copyright (c) 2022 Microsoft Corporation
+**********************************************************************
+```
+
+To open it just start typing it into the `Start` menu:
+`Start/developer comman...` And it will pop up.
+
+In this case the `build.bat` file was written, but you could also manually do it step by step:
+```
+cl -nologo -MT -TC -O2 -c stb_image.c stb_image_write.c stb_truetype.c stb_rect_pack.c
+lib -nologo stb_image.obj -out:..\lib\stb_image.lib
+...
+```
+
+The `odin-stb` repo is a good example of how to set up a single header file cpp app to be compiled statically. You will notice that in the `src/` directory there are both headers and c files:
+```
+src/
+  stb_image.c
+  stb_image.h
+```
+This is because a static lib needs an extry point to compile. If we open `stb_image.c`, we can see that's all it is:
+```c
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+```
+
+
 ### Shader uniforms and Odin maps fun fact
 Fun fact: When a uniform is not used in a shader it gets auto-removed by openGL! This bit me in the ass on this project. I had succeeded in rotating the vertices of my mesh using a rotation matrix called `u_rotation` which simply rotated them along the y axis and had rotated the normals with it too. Like so:
 
