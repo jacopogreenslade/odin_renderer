@@ -5,16 +5,30 @@ import glm "core:math/linalg/glsl"
 import "core:time"
 import gl "vendor:OpenGL"
 import SDL "vendor:sdl2"
+import window "window"
 
+WINDOW_WIDTH :: 854
+WINDOW_HEIGHT :: 480
+
+GL_VERSION_MAJOR :: 3
+GL_VERSION_MINOR :: 3
 
 main :: proc() {
 
-	ctxt, win_ok := window_setup_sdl("3D APP")
-	defer window_teardown_sdl(&ctxt)
+	ctxt, win_ok := window.window_setup_glfw(
+		"3D APP",
+		WINDOW_WIDTH,
+		WINDOW_HEIGHT,
+		GL_VERSION_MAJOR,
+		GL_VERSION_MINOR,
+	)
+	defer window.window_teardown_glfw(&ctxt)
 	if !win_ok {
 		fmt.println("Error. Exiting...")
 		return
 	}
+
+	fmt.println("Created window.")
 
 	app_info, ok := graphics_app_setup()
 	if !ok {
@@ -23,6 +37,7 @@ main :: proc() {
 	}
 	defer graphics_app_teardown(&app_info)
 
+	fmt.println("Made app.")
 
 	// Load the whole entity list, the load the mesh data
 	entity_list := entity_list_deserialize()
@@ -60,23 +75,23 @@ main :: proc() {
 	// Allows me to move stuff around
 	selected := &entity_list.entities[app_info.sel_entity_idx]
 	fmt.println("Selected:", selected.name)
-	
-	input := AppInput {}
+
+	input := window.AppInput{}
 
 	dt_now := time.tick_now()
-	
+
 	loop: for {
 		duration := time.tick_since(start_tick)
 		t := f32(time.duration_seconds(duration))
-		
+
 		// Time since last frame
-		dt:= f32(time.duration_seconds(time.tick_since(dt_now))) 
+		dt := f32(time.duration_seconds(time.tick_since(dt_now)))
 		dt_now = time.tick_now()
-		
+
 		// Every five seconds, check for new assets
 		if check_file_time > 5.0 {
 			fmt.println("Check for new assests...")
-			
+
 			if fnames, dirty := check_for_new_assets(); dirty {
 				defer delete(fnames)
 				graphics_load_new_assets(&app_info, &entity_list, fnames)
@@ -87,7 +102,7 @@ main :: proc() {
 		check_file_time = f32(time.duration_seconds(time.tick_since(last_check)))
 
 		prevInput := input
-		get_input_sdl(&input)
+		window.get_input_glfw(&input, &ctxt)
 		// process_input(&input, &app_info, &entity_list, selected)
 
 		if !prevInput.quit && input.quit {
@@ -108,12 +123,12 @@ main :: proc() {
 			graphics_copy_entity(&app_info, &entity_list, selected)
 		}
 
-		selected.rotation[0] += 20 * input.xAxis * dt;
-		selected.rotation[1] += 20 * input.yAxis * dt;
+		selected.rotation[0] += 20 * input.xAxis * dt
+		selected.rotation[1] += 20 * input.yAxis * dt
 
 		// graphics_mesh_list_render(&app_info, mesh_list, t)
 		graphics_entity_lst_render(&app_info, &entity_list, t)
 
-		window_swap_sdl(&ctxt)
+		window.window_swap_glfw(&ctxt)
 	}
 }

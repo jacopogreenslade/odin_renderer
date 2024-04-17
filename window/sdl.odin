@@ -1,57 +1,51 @@
-package main
+package window
 
 import "core:fmt"
 import SDL "vendor:sdl2"
+import gl "vendor:OpenGL"
 
-GL_VERSION_MAJOR :: 3
-GL_VERSION_MINOR :: 3
 
-WINDOW_WIDTH :: 854
-WINDOW_HEIGHT :: 480
-
-WinCtxt :: struct {
-	name:    string,
-	window:  ^SDL.Window,
-	gl_ctxt: SDL.GLContext,
-}
-
-window_setup_sdl :: proc(app_name: cstring) -> (WinCtxt, bool) {
+window_setup_sdl :: proc(app_name: cstring, w, h, glMajV, glMinV: i32) -> (SDLWinCtxt, bool) {
 	i := SDL.Init({.VIDEO})
 	if i != 0 {
 		fmt.println("Failed to initialize SDL.")
-		return WinCtxt{}, false
+		return SDLWinCtxt{}, false
 	}
 
-	ctxt := WinCtxt{}
+	ctxt := SDLWinCtxt{}
 
 	ctxt.window = SDL.CreateWindow(
 		app_name,
 		SDL.WINDOWPOS_UNDEFINED,
 		SDL.WINDOWPOS_UNDEFINED,
-		WINDOW_WIDTH,
-		WINDOW_HEIGHT,
+		w,
+		h,
 		{.OPENGL},
 	)
 	if ctxt.window == nil {
 		fmt.eprintln("Failed to create window.")
-		return WinCtxt{}, false
+		return SDLWinCtxt{}, false
 	}
 	// defer SDL.DestroyWindow(window)
 
 	SDL.GL_SetAttribute(.CONTEXT_PROFILE_MASK, i32(SDL.GLprofile.CORE))
-	SDL.GL_SetAttribute(.CONTEXT_MAJOR_VERSION, GL_VERSION_MAJOR)
-	SDL.GL_SetAttribute(.CONTEXT_MINOR_VERSION, GL_VERSION_MINOR)
+	SDL.GL_SetAttribute(.CONTEXT_MAJOR_VERSION, glMajV)
+	SDL.GL_SetAttribute(.CONTEXT_MINOR_VERSION, glMinV)
 
 	ctxt.gl_ctxt = SDL.GL_CreateContext(ctxt.window)
 	if ctxt.gl_ctxt == nil {
 		fmt.println("Failed to create GL context.")
-		return WinCtxt{}, false
+		return SDLWinCtxt{}, false
 	}
+
+	// load the OpenGL procedures once an OpenGL context has been established
+	gl.load_up_to(int(glMajV), int(glMinV), SDL.gl_set_proc_address)
+
 	// defer SDL.GL_DeleteContext(gl_context)
 	return ctxt, true
 }
 
-window_teardown_sdl :: proc(ctxt: ^WinCtxt) {
+window_teardown_sdl :: proc(ctxt: ^SDLWinCtxt) {
 	defer SDL.Quit()
 	if ctxt.window == nil {return}
 	defer SDL.DestroyWindow(ctxt.window)
@@ -59,17 +53,8 @@ window_teardown_sdl :: proc(ctxt: ^WinCtxt) {
 	defer SDL.GL_DeleteContext(ctxt.gl_ctxt)
 }
 
-window_swap_sdl :: proc(ctxt: ^WinCtxt) {
+window_swap_sdl :: proc(ctxt: ^SDLWinCtxt) {
 	SDL.GL_SwapWindow(ctxt.window)
-}
-
-AppInput :: struct {
-	xAxis: f32,
-	yAxis: f32,
-	save:  bool,
-	copy:  bool,
-	quit:  bool,
-	tab: 	 bool,
 }
 
 get_input_sdl :: proc(prev_input: ^AppInput) {

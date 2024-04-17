@@ -4,8 +4,8 @@ import "core:fmt"
 import glm "core:math/linalg/glsl"
 import "core:strings"
 import gl "vendor:OpenGL"
-import SDL "vendor:sdl2"
 import stb "src"
+import window "window"
 
 GraphicsApp :: struct {
 	shader_program_id: u32,
@@ -36,8 +36,7 @@ VrtAttrib :: struct {
 
 graphics_app_setup :: proc() -> (GraphicsApp, bool) {
 	info := GraphicsApp{}
-	// load the OpenGL procedures once an OpenGL context has been established
-	gl.load_up_to(GL_VERSION_MAJOR, GL_VERSION_MINOR, SDL.gl_set_proc_address)
+	
 	// useful utility procedures that are part of vendor:OpenGl
 
 	// Load the default gl shaders at startup
